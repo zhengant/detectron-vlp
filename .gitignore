@@ -33,3 +33,6 @@ lib/utils/cython_*.c
 # Mac files
 *.DS_Store
 
+log/
+.vscode/
+*.pkl
