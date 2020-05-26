@@ -40,9 +40,10 @@ import timeit
 import json
 import h5py
 import itertools
+from tqdm import tqdm
 
-from utils.io import cache_url
-import utils.c2 as c2_utils
+from detectron.utils.io import cache_url
+import detectron.utils.c2 as c2_utils
 
 c2_utils.import_detectron_ops()
 # OpenCL may be enabled by default in OpenCV3; disable it because it's not
@@ -52,16 +53,17 @@ cv2.ocl.setUseOpenCL(False)
 from caffe2.python import workspace
 import caffe2
 
-from core.config import assert_and_infer_cfg
-from core.config import cfg
-from core.config import merge_cfg_from_file
-from utils.timer import Timer
-import core.test_engine as infer_engine
-import datasets.dummy_datasets as dummy_datasets
-import utils.c2 as c2_utils
-import utils.logging
-import utils.vis as vis_utils
-from utils.boxes import nms
+from detectron.core.config import assert_and_infer_cfg
+from detectron.core.config import cfg
+from detectron.core.config import merge_cfg_from_file
+from detectron.utils.timer import Timer
+import detectron.core.test_engine as infer_engine
+import detectron.core.test as infer
+import detectron.datasets.dummy_datasets as dummy_datasets
+import detectron.utils.c2 as c2_utils
+import detectron.utils.logging
+import detectron.utils.vis as vis_utils
+from detectron.utils.boxes import nms
 c2_utils.import_detectron_ops()
 # OpenCL may be enabled by default in OpenCV3; disable it because it's not
 # thread safe and causes unwanted GPU memory allocations.
@@ -164,7 +166,7 @@ def get_detections_from_im(cfg, model, im, image_id, featmap_blob_name, feat_blo
 
     assert conf_thresh >= 0.
     with c2_utils.NamedCudaScope(0):
-        scores, cls_boxes, im_scale = infer_engine.im_detect_bbox(model, im,cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, boxes=bboxes)
+        scores, cls_boxes, im_scale = infer.im_detect_bbox(model, im,cfg.TEST.SCALE, cfg.TEST.MAX_SIZE, boxes=bboxes)
         num_rpn = scores.shape[0]
         region_feat = workspace.FetchBlob(feat_blob_name)
         max_conf = np.zeros((num_rpn,), dtype=np.float32)
@@ -251,13 +253,12 @@ def main(args):
             im_list = valid_ids.keys()
             print('number of valid SBU images {}'.format(len(im_list)))
 
-        for i, im_name in enumerate(im_list):
+        for i, im_name in enumerate(tqdm(im_list)):
             im_base_name = os.path.basename(im_name)
             image_id = im_base_name
-            if image_id[-4-len(args.proc_split):-4] == args.proc_split:
+            if True: # image_id[-4-len(args.proc_split):-4] == args.proc_split:
                 im_name = os.path.join(args.im_or_folder, image_id)
 
-                print(im_name)
                 im = cv2.imread(im_name)
                 result = get_detections_from_im(cfg, model, im, image_id, '', args.feat_name,
                                                            args.min_bboxes, args.max_bboxes)
@@ -278,6 +279,6 @@ def main(args):
 
 if __name__ == '__main__':
     workspace.GlobalInit(['caffe2', '--caffe2_log_level=0'])
-    utils.logging.setup_logging(__name__)
+    detectron.utils.logging.setup_logging(__name__)
     args = parse_args()
     main(args)
